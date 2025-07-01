@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Zone Extension Icons</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .icons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .icon-item {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .icon-item h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+        }
+
+        .icon-canvas {
+            margin: 10px 0;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+
+        .download-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .download-btn:hover {
+            background: #3367d6;
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #1565c0;
+        }
+
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Tab Saver Extension Icons</h1>
+
+        <div class="icons-grid">
+            <div class="icon-item">
+                <h3>16x16 (Toolbar)</h3>
+                <canvas id="icon16" class="icon-canvas" width="16" height="16"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon16', 'icon16.png')">Download icon16.png</button>
+            </div>
+
+            <div class="icon-item">
+                <h3>48x48 (Extension Page)</h3>
+                <canvas id="icon48" class="icon-canvas" width="48" height="48"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon48', 'icon48.png')">Download icon48.png</button>
+            </div>
+
+            <div class="icon-item">
+                <h3>128x128 (Chrome Web Store)</h3>
+                <canvas id="icon128" class="icon-canvas" width="128" height="128"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon128', 'icon128.png')">Download
+                    icon128.png</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>How to Use These Icons:</h3>
+            <ol>
+                <li>Click each "Download" button to save the PNG files</li>
+                <li>Place all three PNG files in your extension folder</li>
+                <li>The manifest.json already references these files correctly</li>
+                <li>Load your extension in Chrome and the icons will appear</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            const scale = size / 128; // Scale factor based on 128px base design
+
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+
+            // Background circle
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, 60 * scale, 0, 2 * Math.PI);
+            ctx.fillStyle = '#4285f4';
+            ctx.fill();
+            ctx.strokeStyle = '#2565cc';
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+
+            // Helper function to draw rounded rectangles (fallback for older browsers)
+            function drawRoundedRect(x, y, w, h, radius, fillColor, opacity = 1) {
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                ctx.fillStyle = fillColor;
+                ctx.beginPath();
+
+                // Create rounded rectangle path manually
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + w - radius, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                ctx.lineTo(x + w, y + h - radius);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                ctx.lineTo(x + radius, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Tab stack - back tab
+            drawRoundedRect(20 * scale, 35 * scale, 50 * scale, 35 * scale, 4 * scale, '#ffffff', 0.7);
+            drawRoundedRect(20 * scale, 35 * scale, 50 * scale, 8 * scale, 4 * scale, '#e8f0fe', 1);
+
+            // Tab stack - middle tab
+            drawRoundedRect(30 * scale, 45 * scale, 50 * scale, 35 * scale, 4 * scale, '#ffffff', 0.85);
+            drawRoundedRect(30 * scale, 45 * scale, 50 * scale, 8 * scale, 4 * scale, '#e8f0fe', 1);
+
+            // Tab stack - front tab
+            drawRoundedRect(40 * scale, 55 * scale, 50 * scale, 35 * scale, 4 * scale, '#ffffff', 1);
+            drawRoundedRect(40 * scale, 55 * scale, 50 * scale, 8 * scale, 4 * scale, '#e8f0fe', 1);
+
+            // Tab content lines (only show on larger sizes)
+            if (size >= 32) {
+                drawRoundedRect(45 * scale, 67 * scale, 30 * scale, 2 * scale, 1 * scale, '#5f6368');
+                drawRoundedRect(45 * scale, 72 * scale, 25 * scale, 2 * scale, 1 * scale, '#5f6368');
+                drawRoundedRect(45 * scale, 77 * scale, 35 * scale, 2 * scale, 1 * scale, '#5f6368');
+            }
+
+            // Bookmark/save icon
+            ctx.beginPath();
+            ctx.moveTo(95 * scale, 45 * scale);
+            ctx.lineTo(95 * scale, 85 * scale);
+            ctx.lineTo(85 * scale, 78 * scale);
+            ctx.lineTo(75 * scale, 85 * scale);
+            ctx.lineTo(75 * scale, 45 * scale);
+            ctx.closePath();
+            ctx.fillStyle = '#34a853';
+            ctx.fill();
+            ctx.strokeStyle = '#2d7d32';
+            ctx.lineWidth = 1 * scale;
+            ctx.stroke();
+
+            // Plus icon
+            ctx.beginPath();
+            ctx.arc(85 * scale, 35 * scale, 12 * scale, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ea4335';
+            ctx.fill();
+
+            // Plus sign
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.max(1, 2 * scale);
+            ctx.lineCap = 'round';
+
+            // Horizontal line
+            ctx.beginPath();
+            ctx.moveTo(79 * scale, 35 * scale);
+            ctx.lineTo(91 * scale, 35 * scale);
+            ctx.stroke();
+
+            // Vertical line
+            ctx.beginPath();
+            ctx.moveTo(85 * scale, 29 * scale);
+            ctx.lineTo(85 * scale, 41 * scale);
+            ctx.stroke();
+        }
+
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+
+            // Ensure the canvas has content
+            if (!canvas.getContext) {
+                alert('Canvas not supported');
+                return;
+            }
+
+            try {
+                // Convert canvas to blob and download
+                canvas.toBlob(function (blob) {
+                    if (!blob) {
+                        alert('Failed to generate image');
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            } catch (error) {
+                console.error('Download failed:', error);
+                alert('Download failed. Please try again.');
+            }
+        }
+
+        // Draw all icons when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Small delay to ensure DOM is fully ready
+            setTimeout(() => {
+                drawIcon(document.getElementById('icon16'), 16);
+                drawIcon(document.getElementById('icon48'), 48);
+                drawIcon(document.getElementById('icon128'), 128);
+                console.log('Icons drawn successfully');
+            }, 100);
+        });
+    </script>
+</body>
+
+</html>
