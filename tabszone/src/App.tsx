@@ -178,7 +178,7 @@ export default function App() {
     try {
       const newSavedGroup: TabGroup = {
         ...group,
-        id: Date.now(),
+      id: Date.now(),
         createdAt: new Date().toLocaleString(),
         isSaved: true,
         windowId: undefined, // Remove windowId for saved groups
@@ -402,38 +402,38 @@ export default function App() {
       key={group.id}
       className="hover:bg-accent/50 transition-colors py-0 rounded-md"
     >
-      <CardContent className="p-3">
-        <div className="flex gap-3">
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <div className="flex items-center gap-2 mb-1">
+                  <CardContent className="p-3">
+                    <div className="flex gap-3">
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className="flex items-center gap-2 mb-1">
                   {editingGroup === group.id ? (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 flex-shrink-0"
-                        onClick={() => toggleGroupExpansion(group.id)}
-                      >
-                        {expandedGroups.has(group.id) ? (
-                          <ChevronDown className="w-3 h-3" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3" />
-                        )}
-                      </Button>
-                      <Input
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 flex-shrink-0"
+                                onClick={() => toggleGroupExpansion(group.id)}
+                              >
+                                {expandedGroups.has(group.id) ? (
+                                  <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3" />
+                                )}
+                              </Button>
+                                  <Input
+                                    value={newGroupName}
+                                    onChange={(e) => setNewGroupName(e.target.value)}
                         className="h-7 text-sm flex-1"
-                        onKeyDown={(e) => {
+                                    onKeyDown={(e) => {
                           if (e.key === "Enter") saveRename();
                           if (e.key === "Escape") setEditingGroup(null);
-                        }}
+                                    }}
                         onBlur={saveRename}
-                        autoFocus
-                      />
+                                    autoFocus
+                                  />
                     </>
                   ) : (
                     <>
@@ -441,7 +441,7 @@ export default function App() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0 flex-shrink-0"
-                        onClick={() => toggleGroupExpansion(group.id)}
+                                  onClick={() => toggleGroupExpansion(group.id)}
                       >
                         {expandedGroups.has(group.id) ? (
                           <ChevronDown className="w-3 h-3" />
@@ -456,32 +456,32 @@ export default function App() {
                           setNewGroupName(group.name);
                         }}
                         title="Click to edit name"
-                      >
-                        {group.name}
-                      </h3>
+                                >
+                                  {group.name}
+                                </h3>
                     </>
-                  )}
-                </div>
+                              )}
+                            </div>
 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3 h-3" />
-                    {group.tabCount} tabs
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {group.createdAt}
-                  </span>
-                </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
+                              <span className="flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                {group.tabCount} tabs
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {group.createdAt}
+                              </span>
+                            </div>
 
-                {/* Collapsed Preview */}
-                {!expandedGroups.has(group.id) && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {group.tabs.slice(0, 2).map((tab, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-1 bg-muted rounded px-1.5 py-0.5 text-xs max-w-20"
-                      >
+                            {/* Collapsed Preview */}
+                            {!expandedGroups.has(group.id) && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {group.tabs.slice(0, 2).map((tab, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-1 bg-muted rounded px-1.5 py-0.5 text-xs max-w-20"
+                                  >
                         <img
                           src={tab.favicon}
                           alt=""
@@ -490,28 +490,28 @@ export default function App() {
                         <span className="truncate">
                           {tab.title.split(" - ")[0]}
                         </span>
-                      </div>
-                    ))}
-                    {group.tabs.length > 2 && (
+                                  </div>
+                                ))}
+                                {group.tabs.length > 2 && (
                       <div className="bg-muted rounded px-1.5 py-0.5 text-xs">
                         +{group.tabs.length - 2}
                       </div>
-                    )}
-                  </div>
-                )}
+                                )}
+                              </div>
+                            )}
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1">
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1">
                   {group.isSaved ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenGroup(group)}
-                      className="h-7 text-xs flex-1"
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Open All
-                    </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenGroup(group)}
+                                className="h-7 text-xs flex-1"
+                              >
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Open All
+                              </Button>
                   ) : (
                     <Button
                       size="sm"
@@ -523,75 +523,75 @@ export default function App() {
                       Save
                     </Button>
                   )}
-                </div>
-              </div>
+                            </div>
+                          </div>
 
-              {/* More Options */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                          {/* More Options */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 flex-shrink-0"
                   >
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+                                <MoreVertical className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
                   {group.isSaved ? (
-                    <DropdownMenuItem onClick={() => handleOpenGroup(group)}>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open All
-                    </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenGroup(group)}>
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Open All
+                              </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem onClick={() => handleSaveGroup(group)}>
                       <Save className="w-4 h-4 mr-2" />
                       Save Group
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
+                              <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => handleDeleteGroup(group)}
                     className="text-destructive"
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
 
-        {/* Expanded Tab List - Full Width */}
-        {expandedGroups.has(group.id) && (
-          <div className="mt-3 pt-3 border-t space-y-1 max-h-32 overflow-y-auto">
-            {group.tabs.map((tab, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer group transition-colors"
+                    {/* Expanded Tab List - Full Width */}
+                    {expandedGroups.has(group.id) && (
+                      <div className="mt-3 pt-3 border-t space-y-1 max-h-32 overflow-y-auto">
+                        {group.tabs.map((tab, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer group transition-colors"
                 onClick={() => handleOpenSingleTab(tab, group)}
-              >
+                          >
                 <img
                   src={tab.favicon}
                   alt=""
                   className="w-4 h-4 rounded-sm object-cover flex-shrink-0"
                 />
-                <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate group-hover:text-primary">
                     {tab.title}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {tab.url}
                   </div>
-                </div>
-                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                            </div>
+                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
   );
 
   return (
@@ -680,8 +680,8 @@ export default function App() {
               <div className="text-center py-8 text-muted-foreground">
                 <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No groups found</p>
-              </div>
-            )}
+            </div>
+          )}
         </div>
       </ScrollArea>
 

@@ -23,6 +23,7 @@ interface TabGroup {
   tabCount: number;
   createdAt: string;
   tabs: Tab[];
+  thumbnail?: string; // Base64 screenshot data
   isSaved?: boolean; // Whether this is a saved group or live window
   windowId?: number; // For live windows
 }
@@ -37,6 +38,7 @@ interface ImportTab {
 interface ImportGroup {
   name?: string;
   createdAt?: string;
+  thumbnail?: string;
   tabs?: ImportTab[];
 }
 
@@ -97,16 +99,28 @@ export default function App() {
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
   const [importJsonText, setImportJsonText] = useState<string>("");
 
+  // Thumbnail-related state
+  const [thumbnailCache, setThumbnailCache] = useState<Map<string, string>>(
+    new Map()
+  );
+
   // Load all groups (saved + live windows) on mount
   useEffect(() => {
-    loadAllGroups();
+    const initializeApp = async () => {
+      const cache = await loadThumbnailCache();
+      await loadAllGroups(cache);
+    };
+    initializeApp();
   }, []);
 
   // Screenshot caching functions
 
   // Chrome extension functions
-  const loadAllGroups = async () => {
+  const loadAllGroups = async (cache?: Map<string, string>) => {
     try {
+      // Use provided cache or fallback to current state
+      const currentCache = cache || thumbnailCache;
+
       // Get current window
       const currentWindow = await chrome.windows.getCurrent();
       setCurrentWindowId(currentWindow.id || null);
@@ -114,9 +128,16 @@ export default function App() {
       // Get all windows and their tabs
       const windows = await chrome.windows.getAll({ populate: true });
 
-      const liveGroups: TabGroup[] = windows.map((window) => {
+      const liveGroups: TabGroup[] = [];
+
+      for (const window of windows) {
         const tabs = window.tabs || [];
-        const windowTabs: Tab[] = tabs.map((tab) => ({
+        // Filter out chrome:// internal pages
+        const filteredTabs = tabs.filter(
+          (tab) => tab.url && !tab.url.startsWith("chrome://")
+        );
+
+        const windowTabs: Tab[] = filteredTabs.map((tab) => ({
           title: tab.title || "Untitled",
           favicon:
             tab.favIconUrl ||
@@ -127,6 +148,11 @@ export default function App() {
           tabId: tab.id, // Include tab ID for active tabs
         }));
 
+        // Skip windows with no valid tabs
+        if (windowTabs.length === 0) {
+          continue;
+        }
+
         // Get the first tab's title for window name
         const firstTabTitle = windowTabs[0]?.title || "Untitled";
         const windowName =
@@ -134,16 +160,35 @@ export default function App() {
             ? firstTabTitle.substring(0, 30) + "..."
             : firstTabTitle;
 
-        return {
+        // Check cache first, then capture if needed
+        let thumbnail = undefined;
+        if (window.id) {
+          const cacheKey = getThumbnailCacheKey(window.id, window.id);
+          thumbnail = currentCache.get(cacheKey);
+
+          // Only capture new screenshot if not in cache
+          if (!thumbnail) {
+            thumbnail = await captureActiveTabScreenshot(window.id);
+            if (thumbnail) {
+              const newCache = new Map(currentCache);
+              newCache.set(cacheKey, thumbnail);
+              setThumbnailCache(newCache);
+              await saveThumbnailCache(newCache);
+            }
+          }
+        }
+
+        liveGroups.push({
           id: window.id || Date.now(),
           name: windowName,
           tabCount: windowTabs.length,
           createdAt: "Active",
           tabs: windowTabs,
+          thumbnail,
           isSaved: false,
           windowId: window.id,
-        };
-      });
+        });
+      }
 
       // Get saved groups
       const result = await chrome.storage.local.get(["tabGroups"]);
@@ -186,10 +231,17 @@ export default function App() {
 
   const handleSaveGroup = async (group: TabGroup) => {
     try {
+      // Capture thumbnail before saving if it's an active group
+      let thumbnail = group.thumbnail;
+      if (!thumbnail && group.windowId) {
+        thumbnail = await captureActiveTabScreenshot(group.windowId);
+      }
+
       const newSavedGroup: TabGroup = {
         ...group,
         id: Date.now(),
         createdAt: new Date().toLocaleString(),
+        thumbnail,
         isSaved: true,
         windowId: undefined, // Remove windowId for saved groups
         // Remove tabId from tabs since they're no longer live
@@ -240,6 +292,15 @@ export default function App() {
       if (tabs.length > group.tabs.length) {
         const tabId = tabs[0].id;
         if (tabId) chrome.tabs.remove(tabId);
+      }
+
+      // Preserve the thumbnail in cache when converting saved group to active
+      if (group.isSaved && group.thumbnail && window.id) {
+        const cacheKey = getThumbnailCacheKey(window.id, window.id);
+        const newCache = new Map(thumbnailCache);
+        newCache.set(cacheKey, group.thumbnail);
+        setThumbnailCache(newCache);
+        await saveThumbnailCache(newCache);
       }
 
       // Remove the group from saved groups since it's now active
@@ -326,6 +387,7 @@ export default function App() {
       groups: savedOnly.map((group) => ({
         name: group.name,
         createdAt: group.createdAt,
+        thumbnail: group.thumbnail,
         tabs: group.tabs.map((tab) => ({
           title: tab.title,
           url: tab.url,
@@ -364,6 +426,7 @@ export default function App() {
           name: group.name || "Imported Group",
           tabCount: group.tabs?.length || 0,
           createdAt: group.createdAt || new Date().toLocaleString(),
+          thumbnail: group.thumbnail,
           tabs:
             group.tabs?.map((tab: ImportTab) => ({
               title: tab.title || "Untitled",
@@ -397,165 +460,230 @@ export default function App() {
       className="hover:bg-accent/50 transition-colors py-0 rounded-md"
     >
       <CardContent className="p-3">
-        <div className="flex gap-3">
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <div className="flex items-center gap-2 mb-1">
-                  {editingGroup === group.id ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 flex-shrink-0"
-                        onClick={() => toggleGroupExpansion(group.id)}
-                      >
-                        {expandedGroups.has(group.id) ? (
-                          <ChevronDown className="w-3 h-3" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3" />
-                        )}
-                      </Button>
-                      <Input
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
-                        className="h-7 text-sm flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveRename();
-                          if (e.key === "Escape") setEditingGroup(null);
-                        }}
-                        onBlur={saveRename}
-                        autoFocus
+        <div className="space-y-2">
+          {/* Top Row: Thumbnail and Title/Info */}
+          <div className="flex gap-3">
+            {/* Thumbnail */}
+            <div className="flex-shrink-0">
+              {getThumbnailForGroup(group) ? (
+                <img
+                  src={getThumbnailForGroup(group)}
+                  alt={`${group.name} thumbnail`}
+                  className="w-20 h-15 object-cover rounded border"
+                />
+              ) : (
+                <div className="w-20 h-15">
+                  <svg
+                    width="80"
+                    height="60"
+                    viewBox="0 0 80 60"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="rounded border bg-muted"
+                  >
+                    <rect width="80" height="60" fill="hsl(var(--muted))" />
+                    <g opacity="0.4">
+                      <rect
+                        x="20"
+                        y="15"
+                        width="40"
+                        height="3"
+                        rx="1.5"
+                        fill="hsl(var(--muted-foreground))"
                       />
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 flex-shrink-0"
-                        onClick={() => toggleGroupExpansion(group.id)}
-                      >
-                        {expandedGroups.has(group.id) ? (
-                          <ChevronDown className="w-3 h-3" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3" />
-                        )}
-                      </Button>
-                      <h3
-                        className="font-medium text-sm truncate cursor-text hover:text-primary flex-1"
-                        onClick={() => {
-                          setEditingGroup(group.id);
-                          setNewGroupName(group.name);
-                        }}
-                        title="Click to edit name"
-                      >
-                        {group.name}
-                      </h3>
-                    </>
-                  )}
+                      <rect
+                        x="15"
+                        y="22"
+                        width="50"
+                        height="2"
+                        rx="1"
+                        fill="hsl(var(--muted-foreground))"
+                      />
+                      <rect
+                        x="25"
+                        y="28"
+                        width="30"
+                        height="2"
+                        rx="1"
+                        fill="hsl(var(--muted-foreground))"
+                      />
+                      <rect
+                        x="20"
+                        y="38"
+                        width="40"
+                        height="8"
+                        rx="4"
+                        fill="hsl(var(--muted-foreground))"
+                      />
+                    </g>
+                  </svg>
                 </div>
+              )}
+            </div>
 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3 h-3" />
-                    {group.tabCount} tabs
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {group.createdAt}
-                  </span>
-                </div>
-
-                {/* Collapsed Preview */}
-                {!expandedGroups.has(group.id) && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {group.tabs.slice(0, 2).map((tab, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-1 bg-muted rounded px-1.5 py-0.5 text-xs max-w-20"
-                      >
-                        <img
-                          src={tab.favicon}
-                          alt=""
-                          className="w-3 h-3 rounded-sm object-cover flex-shrink-0"
+            {/* Title and Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0 pr-2">
+                  {/* Title Line */}
+                  <div className="flex items-center gap-2 mb-1">
+                    {editingGroup === group.id ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 flex-shrink-0"
+                          onClick={() => toggleGroupExpansion(group.id)}
+                        >
+                          {expandedGroups.has(group.id) ? (
+                            <ChevronDown className="w-3 h-3" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3" />
+                          )}
+                        </Button>
+                        <Input
+                          value={newGroupName}
+                          onChange={(e) => setNewGroupName(e.target.value)}
+                          className="h-6 text-sm flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveRename();
+                            if (e.key === "Escape") setEditingGroup(null);
+                          }}
+                          onBlur={saveRename}
+                          autoFocus
                         />
-                        <span className="truncate">
-                          {tab.title.split(" - ")[0]}
-                        </span>
-                      </div>
-                    ))}
-                    {group.tabs.length > 2 && (
-                      <div className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                        +{group.tabs.length - 2}
-                      </div>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 flex-shrink-0"
+                          onClick={() => toggleGroupExpansion(group.id)}
+                        >
+                          {expandedGroups.has(group.id) ? (
+                            <ChevronDown className="w-3 h-3" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3" />
+                          )}
+                        </Button>
+                        <h3
+                          className="font-medium text-sm truncate cursor-text hover:text-primary flex-1"
+                          onClick={() => {
+                            setEditingGroup(group.id);
+                            setNewGroupName(group.name);
+                          }}
+                          title="Click to edit name"
+                        >
+                          {group.name}
+                        </h3>
+                      </>
                     )}
                   </div>
-                )}
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1">
-                  {group.isSaved ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenGroup(group)}
-                      className="h-7 text-xs flex-1"
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Open All
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleSaveGroup(group)}
-                      className="h-7 text-xs flex-1"
-                    >
-                      <Save className="w-3 h-3 mr-1" />
-                      Save
-                    </Button>
-                  )}
+                  {/* Info Line */}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      {group.tabCount} tabs
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {group.createdAt}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* More Options */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 flex-shrink-0"
-                  >
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  {group.isSaved ? (
-                    <>
-                      <DropdownMenuItem onClick={() => handleOpenGroup(group)}>
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open All
+                {/* More Options */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 flex-shrink-0"
+                    >
+                      <MoreVertical className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    {group.isSaved ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleOpenGroup(group)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open All
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteGroup(group)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <DropdownMenuItem onClick={() => handleSaveGroup(group)}>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Group
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => handleDeleteGroup(group)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    <DropdownMenuItem onClick={() => handleSaveGroup(group)}>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Group
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
+          </div>
+
+          {/* Bottom Row: Tab Preview */}
+          {!expandedGroups.has(group.id) && (
+            <div className="flex flex-wrap gap-1">
+              {group.tabs.slice(0, 4).map((tab, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-1 bg-muted rounded px-2 py-1 text-xs"
+                >
+                  <img
+                    src={tab.favicon}
+                    alt=""
+                    className="w-3 h-3 rounded-sm object-cover flex-shrink-0"
+                  />
+                  <span className="truncate max-w-24">
+                    {tab.title.split(" - ")[0]}
+                  </span>
+                </div>
+              ))}
+              {group.tabs.length > 4 && (
+                <div className="bg-muted rounded px-2 py-1 text-xs">
+                  +{group.tabs.length - 4} more
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Button Row */}
+          <div className="flex justify-end">
+            {group.isSaved ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenGroup(group)}
+                className="h-7 text-xs"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" />
+                Open All
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => handleSaveGroup(group)}
+                className="h-7 text-xs"
+              >
+                <Save className="w-3 h-3 mr-1" />
+                Save
+              </Button>
+            )}
           </div>
         </div>
 
@@ -589,6 +717,60 @@ export default function App() {
       </CardContent>
     </Card>
   );
+
+  // Thumbnail management functions
+  const getThumbnailCacheKey = (groupId: number, windowId?: number) => {
+    return `thumbnail_${windowId || groupId}`;
+  };
+
+  const loadThumbnailCache = async (): Promise<Map<string, string>> => {
+    try {
+      const result = await chrome.storage.local.get(["thumbnailCache"]);
+      const cache = result.thumbnailCache
+        ? new Map(Object.entries(result.thumbnailCache))
+        : new Map();
+      setThumbnailCache(cache);
+      return cache;
+    } catch (error) {
+      console.error("Failed to load thumbnail cache:", error);
+      return new Map();
+    }
+  };
+
+  const saveThumbnailCache = async (cache: Map<string, string>) => {
+    try {
+      const cacheObj = Object.fromEntries(cache);
+      await chrome.storage.local.set({ thumbnailCache: cacheObj });
+    } catch (error) {
+      console.error("Failed to save thumbnail cache:", error);
+    }
+  };
+
+  const captureActiveTabScreenshot = async (
+    windowId: number
+  ): Promise<string | undefined> => {
+    try {
+      // Get the active tab in the specified window
+      const tabs = await chrome.tabs.query({ windowId, active: true });
+      if (!tabs[0]) return undefined;
+
+      // Capture screenshot of the active tab
+      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+        format: "jpeg",
+        quality: 80,
+      });
+
+      return dataUrl;
+    } catch (error) {
+      console.error("Failed to capture screenshot:", error);
+      return undefined;
+    }
+  };
+
+  const getThumbnailForGroup = (group: TabGroup): string | undefined => {
+    const cacheKey = getThumbnailCacheKey(group.id, group.windowId);
+    return thumbnailCache.get(cacheKey) || group.thumbnail;
+  };
 
   return (
     <div className="w-80 h-[500px] bg-background border shadow-lg">
