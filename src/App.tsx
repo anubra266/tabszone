@@ -99,6 +99,11 @@ export default function App() {
   const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
   const [importJsonText, setImportJsonText] = useState<string>("");
 
+  // Store original group names for windows created from saved groups
+  const [windowGroupNames, setWindowGroupNames] = useState<Map<number, string>>(
+    new Map()
+  );
+
   // Thumbnail-related state
   const [thumbnailCache, setThumbnailCache] = useState<Map<string, string>>(
     new Map()
@@ -120,6 +125,9 @@ export default function App() {
     try {
       // Use provided cache or fallback to current state
       const currentCache = cache || thumbnailCache;
+
+      // Always load the latest window group names from storage
+      const currentWindowGroupNames = await loadWindowGroupNames();
 
       // Get current window
       const currentWindow = await chrome.windows.getCurrent();
@@ -153,12 +161,18 @@ export default function App() {
           continue;
         }
 
-        // Get the first tab's title for window name
-        const firstTabTitle = windowTabs[0]?.title || "Untitled";
-        const windowName =
-          firstTabTitle.length > 30
-            ? firstTabTitle.substring(0, 30) + "..."
-            : firstTabTitle;
+        // Check if we have a stored name for this window (from opened saved group)
+        // Otherwise, use the first tab's title for window name
+        let windowName = window.id
+          ? currentWindowGroupNames.get(window.id)
+          : undefined;
+        if (!windowName) {
+          const firstTabTitle = windowTabs[0]?.title || "Untitled";
+          windowName =
+            firstTabTitle.length > 30
+              ? firstTabTitle.substring(0, 30) + "..."
+              : firstTabTitle;
+        }
 
         // Check cache first, then capture if needed
         let thumbnail = undefined;
@@ -198,6 +212,25 @@ export default function App() {
             isSaved: true,
           }))
         : [];
+
+      // Clean up window group names for windows that no longer exist
+      const currentWindowIds = new Set(
+        windows.map((w) => w.id).filter(Boolean)
+      );
+      const updatedWindowGroupNames = new Map(currentWindowGroupNames);
+      let shouldUpdateNames = false;
+
+      for (const [windowId] of currentWindowGroupNames) {
+        if (!currentWindowIds.has(windowId)) {
+          updatedWindowGroupNames.delete(windowId);
+          shouldUpdateNames = true;
+        }
+      }
+
+      if (shouldUpdateNames) {
+        setWindowGroupNames(updatedWindowGroupNames);
+        await saveWindowGroupNames(updatedWindowGroupNames);
+      }
 
       // Combine live windows and saved groups
       setAllGroups([...liveGroups, ...savedGroups]);
@@ -311,6 +344,14 @@ export default function App() {
         newCache.set(cacheKey, group.thumbnail);
         setThumbnailCache(newCache);
         await saveThumbnailCache(newCache);
+      }
+
+      // Store the group name for this window so it retains its name when converted to active
+      if (group.isSaved && window.id) {
+        const newWindowGroupNames = new Map(windowGroupNames);
+        newWindowGroupNames.set(window.id, group.name);
+        setWindowGroupNames(newWindowGroupNames);
+        await saveWindowGroupNames(newWindowGroupNames);
       }
 
       // Remove the group from saved groups since it's now active
@@ -782,6 +823,40 @@ export default function App() {
   const getThumbnailForGroup = (group: TabGroup): string | undefined => {
     const cacheKey = getThumbnailCacheKey(group.id, group.windowId);
     return thumbnailCache.get(cacheKey) || group.thumbnail;
+  };
+
+  // Window group names management functions
+  const loadWindowGroupNames = async (): Promise<Map<number, string>> => {
+    try {
+      const result = await chrome.storage.local.get(["windowGroupNames"]);
+      const storedNames = result.windowGroupNames || {};
+      const namesMap = new Map<number, string>();
+
+      // Convert stored object back to Map
+      for (const [windowId, name] of Object.entries(storedNames)) {
+        namesMap.set(parseInt(windowId), name as string);
+      }
+
+      setWindowGroupNames(namesMap);
+      return namesMap;
+    } catch (error) {
+      console.error("Failed to load window group names:", error);
+      return new Map();
+    }
+  };
+
+  const saveWindowGroupNames = async (namesMap: Map<number, string>) => {
+    try {
+      // Convert Map to plain object for storage
+      const namesObject: Record<string, string> = {};
+      for (const [windowId, name] of namesMap) {
+        namesObject[windowId.toString()] = name;
+      }
+
+      await chrome.storage.local.set({ windowGroupNames: namesObject });
+    } catch (error) {
+      console.error("Failed to save window group names:", error);
+    }
   };
 
   return (
