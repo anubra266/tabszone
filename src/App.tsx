@@ -224,10 +224,20 @@ export default function App() {
   const currentGroup = filteredGroups.find(
     (group) => group.windowId === currentWindowId && !group.isSaved
   );
-  const activeGroups = filteredGroups.filter(
-    (group) => group.windowId !== currentWindowId && !group.isSaved
-  );
-  const savedGroups = filteredGroups.filter((group) => group.isSaved);
+
+  // Sort active groups by window ID (newer windows have higher IDs, indicating more recent activity)
+  const activeGroups = filteredGroups
+    .filter((group) => group.windowId !== currentWindowId && !group.isSaved)
+    .sort((a, b) => (b.windowId || 0) - (a.windowId || 0));
+
+  // Sort saved groups by creation time (most recently saved first)
+  const savedGroups = filteredGroups
+    .filter((group) => group.isSaved)
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return timeB - timeA; // Most recent first
+    });
 
   const handleSaveGroup = async (group: TabGroup) => {
     try {
@@ -589,7 +599,9 @@ export default function App() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {group.createdAt}
+                      {group.createdAt === "Active"
+                        ? "Active"
+                        : new Date(group.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
